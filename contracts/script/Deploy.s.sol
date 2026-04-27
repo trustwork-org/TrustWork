@@ -1,19 +1,15 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
 
 import {Script} from "forge-std/Script.sol";
-import {EscrowPlatform} from "../src/EscrowPlatform.sol";
 
+// Placeholder script. The four core contracts now require constructor
+// arguments (USDC token, treasury, governance, multisig, trusted forwarder,
+// etc.). A real deployment script will be added in a follow-up.
 contract DeployScript is Script {
-    EscrowPlatform public escrowPlatform;
-
     function setUp() public {}
 
     function run() public {
-        vm.startBroadcast();
-
-        escrowPlatform = new EscrowPlatform();
-
-        vm.stopBroadcast();
+        // intentionally empty
     }
 }
