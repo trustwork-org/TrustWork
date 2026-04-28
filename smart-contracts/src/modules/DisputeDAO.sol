@@ -7,7 +7,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {ERC2771Context} from "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IEscrowPlatform} from "./interfaces/IEscrowPlatform.sol";
+import {IEscrowPlatform} from "../interfaces/IEscrowPlatform.sol";
 
 /**
  * @title DisputeDAO

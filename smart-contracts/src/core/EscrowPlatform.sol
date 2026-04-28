@@ -7,8 +7,8 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ERC2771Context} from "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
-import {IDisputeDAO} from "./interfaces/IDisputeDAO.sol";
-import {IReputationNFT} from "./interfaces/IReputationNFT.sol";
+import {IDisputeDAO} from "../interfaces/IDisputeDAO.sol";
+import {IReputationNFT} from "../interfaces/IReputationNFT.sol";
 
 /**
  * @title EscrowPlatform
