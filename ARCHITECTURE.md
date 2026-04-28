@@ -66,7 +66,7 @@ are resolved via DAO arbitration. Built on Solidity, deployed to Lisk Network.
 │                   REPUTATION & IDENTITY LAYER                    │
 │                                                                  │
 │      ReputationNFT (Soulbound)    |    ProfileRegistry           │
-│      - Minted at 5/20/50/100/250     - IPFS-hash profile store  │
+│      - Minted at 5/20/50/100/250     - IPFS-CID profile store   │
 │        job completion thresholds     - Skills, name, bio         │
 │      - Tier upgrade burns old NFT    - Wallet → profile mapping  │
 │      - Non-transferable                                          │
@@ -254,7 +254,7 @@ rejectMilestone(jobId, milestoneIndex)
     → milestone status must be SUBMITTED
     → milestone status → PENDING (freelancer can revise and resubmit)
 
-raiseDispute(jobId, milestoneIndex, myEvidenceIPFSHash)
+raiseDispute(jobId, milestoneIndex, myEvidenceCID)
     → either client or freelancer
     → job status must be ACTIVE
     → milestone status must be SUBMITTED
@@ -264,7 +264,7 @@ raiseDispute(jobId, milestoneIndex, myEvidenceIPFSHash)
     → platformDisputeFee       = milestone.amount * 200 / 10000   (2%)
     → transfers (disputeFeeForArbitrators + platformDisputeFee) USDC → DisputeDAO
     → calls DisputeDAO.openDispute(
-          jobId, milestoneIndex, msg.sender, myEvidenceIPFSHash,
+          jobId, milestoneIndex, msg.sender, myEvidenceCID,
           disputeFeeForArbitrators, platformDisputeFee
       )
     → NOTE: 92% of milestone.amount remains locked in this contract
@@ -356,8 +356,8 @@ Dispute Struct:
 - uint jobId
 - uint milestoneIndex
 - address raisedBy
-- string partyAEvidenceHash       → IPFS hash from raising party (set at open)
-- string partyBEvidenceHash       → IPFS hash from responding party (submitted later)
+- string partyAEvidenceCID        → IPFS CID from raising party (set at open)
+- string partyBEvidenceCID        → IPFS CID from responding party (submitted later)
 - uint votesForClient
 - uint votesForFreelancer
 - uint arbitratorFee              → 6% of milestone.amount, held for distribution
@@ -372,17 +372,17 @@ Dispute Struct:
 **Key Functions:**
 
 ```
-openDispute(jobId, milestoneIndex, raisedBy, evidenceIPFSHash, arbitratorFee, platformFee)
+openDispute(jobId, milestoneIndex, raisedBy, evidenceCID, arbitratorFee, platformFee)
     → only callable by EscrowPlatform
     → receives (arbitratorFee + platformFee) USDC from EscrowPlatform
     → creates Dispute struct, stores fees
     → selects 3 arbitrators via _selectArbitrators(disputeId)
     → status → VOTING
 
-submitEvidence(disputeId, evidenceIPFSHash)
+submitEvidence(disputeId, evidenceCID)
     → callable by either client or freelancer of the disputed job
     → status must be VOTING, before deadline
-    → stores partyAEvidenceHash (raising party) or partyBEvidenceHash (responding party)
+    → stores partyAEvidenceCID (raising party) or partyBEvidenceCID (responding party)
 
 submitVote(disputeId, vote)
     → only in assignedArbitrators[]
@@ -464,14 +464,14 @@ Maps wallet addresses to IPFS profile hashes. Enables browsing freelancers by sk
 
 ```
 Struct:
-- string ipfsHash        → JSON: { name, role, skills[], bio, portfolioURL }
+- string profileCID      → JSON: { name, role, skills[], bio, portfolioURL }
 - uint registeredAt
 - bool isRegistered
 
 Key Functions:
-registerProfile(ipfsHash)   → stores IPFS hash for msg.sender
-updateProfile(ipfsHash)     → only registered users
-getProfile(address)         → returns (ipfsHash, registeredAt, isRegistered)
+registerProfile(profileCID) → stores IPFS CID for msg.sender
+updateProfile(profileCID)   → only registered users
+getProfile(address)         → returns (profileCID, registeredAt, updatedAt, isRegistered)
 isRegistered(address)       → bool
 ```
 
@@ -632,11 +632,11 @@ Stuck dispute prevention:
 ```
 1. Freelancer submits milestone. Client disputes the quality.
       ↓
-2. Client calls raiseDispute(jobId, 0, clientEvidenceIPFSHash)
+2. Client calls raiseDispute(jobId, 0, clientEvidenceCID)
       → milestone → DISPUTED, job → DISPUTED
       → 6% + 2% of milestone.amount transferred to DisputeDAO
       ↓
-3. Freelancer calls submitEvidence(disputeId, freelancerEvidenceIPFSHash)
+3. Freelancer calls submitEvidence(disputeId, freelancerEvidenceCID)
       ↓
 4. DisputeDAO assigns 3 random arbitrators, 2-day voting window opens
       ↓
@@ -839,7 +839,7 @@ calls releaseFundsAfterDispute()
 - **Fee bounds** — `MIN_FEE_PERCENT` and `MAX_FEE_PERCENT` are immutable constants
 - **Emergency pause** — multisig-controlled, halts all fund movement during exploits
 - **Arbitrator pool minimum** — `openDispute()` reverts if fewer than 3 arbitrators available
-- **IPFS hash integrity** — content hashes stored on-chain, not mutable URLs
+- **IPFS CID integrity** — content-addressed CIDs stored on-chain, not mutable URLs
 - **Soulbound hook** — `_beforeTokenTransfer()` reverts on any wallet-to-wallet NFT transfer
 - **Overflow protection** — Solidity 0.8+ native
 - **Basis points math** — all percentages use integer basis points (e.g. 200 = 2%) to avoid floating point precision loss
