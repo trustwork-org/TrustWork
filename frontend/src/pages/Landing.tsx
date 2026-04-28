@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { motion, useScroll, useTransform, useSpring } from 'framer-motion'
+import { motion, useScroll, useTransform, useSpring, type Variants } from 'framer-motion'
 import { useScrollReveal } from '../hooks/useScrollReveal'
 import { FaLock, FaBolt, FaBalanceScale, FaMedal, FaGlobe, FaFileContract, FaArrowRight } from 'react-icons/fa'
 import { FiCheckCircle } from 'react-icons/fi'
@@ -10,22 +10,17 @@ import AnimatedCounter from '../components/AnimatedCounter'
 // ── Variants ─────────────────────────────────────────────────────────────────
 const fadeUp = {
   hidden: { opacity: 0, y: 40 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' as const } },
 }
-const fadeLeft = {
-  hidden: { opacity: 0, x: -40 },
-  show: { opacity: 1, x: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
-}
-const fadeRight = {
-  hidden: { opacity: 0, x: 40 },
-  show: { opacity: 1, x: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
-}
-const stagger = (d = 0.1) => ({ show: { transition: { staggerChildren: d } } })
+const stagger = (d = 0.1) => ({
+  hidden: {},
+  show: { transition: { staggerChildren: d } },
+})
 
 // ── Scroll-reveal wrapper ─────────────────────────────────────────────────────
 function Reveal({ children, variant = fadeUp, className = '' }: {
   children: React.ReactNode
-  variant?: typeof fadeUp
+  variant?: Variants
   className?: string
 }) {
   const { ref, isInView } = useScrollReveal()
