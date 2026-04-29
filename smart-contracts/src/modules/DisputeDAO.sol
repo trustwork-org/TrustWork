@@ -7,17 +7,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {ERC2771Context} from "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-
-/// @notice Minimal interface DisputeDAO uses to call back into EscrowPlatform.
-///         winner is encoded as 1 = CLIENT, 2 = FREELANCER.
-interface IEscrowPlatform {
-    function releaseFundsAfterDispute(
-        uint256 jobId,
-        uint256 milestoneIndex,
-        uint8 winner,
-        address[] calldata majorityArbitrators
-    ) external;
-}
+import {IEscrowPlatform} from "../interfaces/IEscrowPlatform.sol";
 
 /**
  * @title DisputeDAO
@@ -48,14 +38,18 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
 
     uint256 public constant MIN_VOTING_PERIOD = 10 minutes;
     uint256 public constant MAX_VOTING_PERIOD = 7 days;
-    uint256 public constant MIN_ARBITRATOR_STAKE = 10_000_000;     // 10 USDC (6 dp)
-    uint256 public constant MAX_ARBITRATOR_STAKE = 1_000_000_000;  // 1000 USDC
+    uint256 public constant MIN_ARBITRATOR_STAKE = 10_000_000; // 10 USDC (6 dp)
+    uint256 public constant MAX_ARBITRATOR_STAKE = 1_000_000_000; // 1000 USDC
 
     // ---------------------------------------------------------------------
     // Storage
     // ---------------------------------------------------------------------
 
-    enum DisputeStatus { NONE, VOTING, RESOLVED }
+    enum DisputeStatus {
+        NONE,
+        VOTING,
+        RESOLVED
+    }
 
     struct Dispute {
         uint256 jobId;
@@ -65,8 +59,8 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
         address raisedBy;
         string partyAEvidenceCID; // raisedBy's evidence (set at openDispute)
         string partyBEvidenceCID; // counterparty's evidence (submitted later)
-        uint256 arbitratorFee;     // 6% of milestone amount, held for distribution
-        uint256 platformFee;       // 2% of milestone amount, forwarded to treasury
+        uint256 arbitratorFee; // 6% of milestone amount, held for distribution
+        uint256 platformFee; // 2% of milestone amount, forwarded to treasury
         uint8 votesForClient;
         uint8 votesForFreelancer;
         DisputeStatus status;
@@ -100,14 +94,21 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
     // ---------------------------------------------------------------------
 
     event EscrowPlatformSet(address indexed previous, address indexed current);
-    event PlatformTreasurySet(address indexed previous, address indexed current);
+    event PlatformTreasurySet(
+        address indexed previous,
+        address indexed current
+    );
     event VotingPeriodSet(uint256 previous, uint256 current);
     event MinStakeSet(uint256 previous, uint256 current);
 
     event ArbitratorJoined(address indexed arbitrator, uint256 stake);
     event ArbitratorLeft(address indexed arbitrator, uint256 stakeReturned);
     event ArbitratorEvicted(address indexed arbitrator, uint256 remainingStake);
-    event ArbitratorSlashed(address indexed arbitrator, uint256 amount, string reason);
+    event ArbitratorSlashed(
+        address indexed arbitrator,
+        uint256 amount,
+        string reason
+    );
 
     event DisputeOpened(
         uint256 indexed disputeId,
@@ -117,8 +118,16 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
         address[ARBITRATORS_PER_DISPUTE] arbitrators,
         uint256 deadline
     );
-    event EvidenceSubmitted(uint256 indexed disputeId, address indexed party, string evidenceCID);
-    event VoteSubmitted(uint256 indexed disputeId, address indexed arbitrator, uint8 vote);
+    event EvidenceSubmitted(
+        uint256 indexed disputeId,
+        address indexed party,
+        string evidenceCID
+    );
+    event VoteSubmitted(
+        uint256 indexed disputeId,
+        address indexed arbitrator,
+        uint8 vote
+    );
     event DisputeResolved(
         uint256 indexed disputeId,
         uint8 winner,
@@ -157,11 +166,9 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
         address platformTreasury_,
         address trustedForwarder_,
         address initialOwner
-    )
-        ERC2771Context(trustedForwarder_)
-        Ownable(initialOwner)
-    {
-        if (usdcToken_ == address(0) || platformTreasury_ == address(0)) revert ZeroAddress();
+    ) ERC2771Context(trustedForwarder_) Ownable(initialOwner) {
+        if (usdcToken_ == address(0) || platformTreasury_ == address(0))
+            revert ZeroAddress();
         usdcToken = IERC20(usdcToken_);
         platformTreasury = platformTreasury_;
     }
@@ -183,13 +190,17 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
     }
 
     function setVotingPeriod(uint256 newPeriod) external onlyOwner {
-        if (newPeriod < MIN_VOTING_PERIOD || newPeriod > MAX_VOTING_PERIOD) revert InvalidVotingPeriod();
+        if (newPeriod < MIN_VOTING_PERIOD || newPeriod > MAX_VOTING_PERIOD)
+            revert InvalidVotingPeriod();
         emit VotingPeriodSet(votingPeriod, newPeriod);
         votingPeriod = newPeriod;
     }
 
     function setMinStake(uint256 newMinStake) external onlyOwner {
-        if (newMinStake < MIN_ARBITRATOR_STAKE || newMinStake > MAX_ARBITRATOR_STAKE) revert InvalidStake();
+        if (
+            newMinStake < MIN_ARBITRATOR_STAKE ||
+            newMinStake > MAX_ARBITRATOR_STAKE
+        ) revert InvalidStake();
         emit MinStakeSet(minStake, newMinStake);
         minStake = newMinStake;
     }
@@ -257,12 +268,17 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
         uint256 platformFee
     ) external returns (uint256 disputeId) {
         if (msg.sender != escrowPlatform) revert NotEscrowPlatform();
-        if (client == address(0) || freelancer == address(0)) revert ZeroAddress();
-        if (raisedBy != client && raisedBy != freelancer) revert NotADisputeParty();
+        if (client == address(0) || freelancer == address(0))
+            revert ZeroAddress();
+        if (raisedBy != client && raisedBy != freelancer)
+            revert NotADisputeParty();
 
         // Pick 3 arbitrators excluding the disputants and any currently busy.
-        address[ARBITRATORS_PER_DISPUTE] memory selected =
-            _selectArbitrators(client, freelancer, ++disputeCounter);
+        address[ARBITRATORS_PER_DISPUTE] memory selected = _selectArbitrators(
+            client,
+            freelancer,
+            ++disputeCounter
+        );
 
         disputeId = disputeCounter;
         Dispute storage d = _disputes[disputeId];
@@ -282,20 +298,31 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
             arbitratorBusy[selected[i]] = true;
         }
 
-        emit DisputeOpened(disputeId, jobId, milestoneIndex, raisedBy, selected, d.deadline);
+        emit DisputeOpened(
+            disputeId,
+            jobId,
+            milestoneIndex,
+            raisedBy,
+            selected,
+            d.deadline
+        );
     }
 
     /**
      * @notice Either the client or the freelancer of the disputed job submits
      *         their evidence IPFS CID.
      */
-    function submitEvidence(uint256 disputeId, string calldata evidenceCID) external {
+    function submitEvidence(
+        uint256 disputeId,
+        string calldata evidenceCID
+    ) external {
         Dispute storage d = _disputes[disputeId];
         if (d.status != DisputeStatus.VOTING) revert WrongStatus();
         if (block.timestamp > d.deadline) revert VotingClosed();
 
         address sender = _msgSender();
-        if (sender != d.client && sender != d.freelancer) revert NotADisputeParty();
+        if (sender != d.client && sender != d.freelancer)
+            revert NotADisputeParty();
 
         if (sender == d.raisedBy) {
             // raisedBy is amending their evidence pre-deadline — allowed.
@@ -311,7 +338,8 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
      * @notice Submit a vote: 1 = CLIENT_WINS, 2 = FREELANCER_WINS.
      */
     function submitVote(uint256 disputeId, uint8 vote) external {
-        if (vote != VOTE_CLIENT && vote != VOTE_FREELANCER) revert InvalidVote();
+        if (vote != VOTE_CLIENT && vote != VOTE_FREELANCER)
+            revert InvalidVote();
 
         Dispute storage d = _disputes[disputeId];
         if (d.status != DisputeStatus.VOTING) revert WrongStatus();
@@ -343,7 +371,9 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
         if (block.timestamp <= d.deadline) revert VotingStillOpen();
 
         // Determine winner. Tie or zero votes → FREELANCER (work was submitted).
-        uint8 winner = d.votesForClient > d.votesForFreelancer ? VOTE_CLIENT : VOTE_FREELANCER;
+        uint8 winner = d.votesForClient > d.votesForFreelancer
+            ? VOTE_CLIENT
+            : VOTE_FREELANCER;
 
         // Walk the 3 arbitrators, classifying each.
         address[] memory majority = new address[](ARBITRATORS_PER_DISPUTE);
@@ -384,7 +414,8 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
                 usdcToken.safeTransfer(majority[i], perArbitratorReward);
             }
             // Forward dust (from integer division) to treasury.
-            uint256 dust = d.arbitratorFee - (perArbitratorReward * majorityCount);
+            uint256 dust = d.arbitratorFee -
+                (perArbitratorReward * majorityCount);
             if (dust > 0) {
                 usdcToken.safeTransfer(platformTreasury, dust);
             }
@@ -413,7 +444,10 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
     // Internal helpers
     // ---------------------------------------------------------------------
 
-    function _isAssigned(Dispute storage d, address account) internal view returns (bool) {
+    function _isAssigned(
+        Dispute storage d,
+        address account
+    ) internal view returns (bool) {
         for (uint256 i = 0; i < ARBITRATORS_PER_DISPUTE; ++i) {
             if (d.assignedArbitrators[i] == account) return true;
         }
@@ -461,11 +495,11 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
      *      MVP-grade randomness; manipulable by a single-block proposer.
      *      Post-MVP: switch to Chainlink VRF.
      */
-    function _selectArbitrators(address client, address freelancer, uint256 disputeId)
-        internal
-        view
-        returns (address[ARBITRATORS_PER_DISPUTE] memory chosen)
-    {
+    function _selectArbitrators(
+        address client,
+        address freelancer,
+        uint256 disputeId
+    ) internal view returns (address[ARBITRATORS_PER_DISPUTE] memory chosen) {
         uint256 poolLen = arbitratorPool.length;
 
         // Build eligible set in memory (cap at poolLen).
@@ -481,7 +515,11 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
 
         if (n < ARBITRATORS_PER_DISPUTE) revert InsufficientArbitrators(n);
 
-        uint256 seed = uint256(keccak256(abi.encodePacked(block.prevrandao, block.timestamp, disputeId)));
+        uint256 seed = uint256(
+            keccak256(
+                abi.encodePacked(block.prevrandao, block.timestamp, disputeId)
+            )
+        );
 
         // Pick 3 unique by Fisher-Yates-style swap-and-shrink.
         for (uint256 k = 0; k < ARBITRATORS_PER_DISPUTE; ++k) {
@@ -489,7 +527,9 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
             chosen[k] = eligible[pick];
             // Swap picked into the tail and shrink window.
             eligible[pick] = eligible[n - 1];
-            unchecked { --n; }
+            unchecked {
+                --n;
+            }
             seed = uint256(keccak256(abi.encodePacked(seed, k)));
         }
     }
@@ -498,7 +538,9 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
     // External views (struct contains mappings, so no auto-getter)
     // ---------------------------------------------------------------------
 
-    function getDisputeCore(uint256 disputeId)
+    function getDisputeCore(
+        uint256 disputeId
+    )
         external
         view
         returns (
@@ -513,40 +555,51 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
     {
         Dispute storage d = _disputes[disputeId];
         if (d.status == DisputeStatus.NONE) revert DisputeNotFound();
-        return (d.jobId, d.milestoneIndex, d.client, d.freelancer, d.raisedBy, d.status, d.deadline);
+        return (
+            d.jobId,
+            d.milestoneIndex,
+            d.client,
+            d.freelancer,
+            d.raisedBy,
+            d.status,
+            d.deadline
+        );
     }
 
-    function getDisputeEvidence(uint256 disputeId)
+    function getDisputeEvidence(
+        uint256 disputeId
+    )
         external
         view
-        returns (string memory partyAEvidenceCID, string memory partyBEvidenceCID)
+        returns (
+            string memory partyAEvidenceCID,
+            string memory partyBEvidenceCID
+        )
     {
         Dispute storage d = _disputes[disputeId];
         if (d.status == DisputeStatus.NONE) revert DisputeNotFound();
         return (d.partyAEvidenceCID, d.partyBEvidenceCID);
     }
 
-    function getDisputeFees(uint256 disputeId)
-        external
-        view
-        returns (uint256 arbitratorFee, uint256 platformFee)
-    {
+    function getDisputeFees(
+        uint256 disputeId
+    ) external view returns (uint256 arbitratorFee, uint256 platformFee) {
         Dispute storage d = _disputes[disputeId];
         if (d.status == DisputeStatus.NONE) revert DisputeNotFound();
         return (d.arbitratorFee, d.platformFee);
     }
 
-    function getDisputeTally(uint256 disputeId)
-        external
-        view
-        returns (uint8 votesForClient, uint8 votesForFreelancer)
-    {
+    function getDisputeTally(
+        uint256 disputeId
+    ) external view returns (uint8 votesForClient, uint8 votesForFreelancer) {
         Dispute storage d = _disputes[disputeId];
         if (d.status == DisputeStatus.NONE) revert DisputeNotFound();
         return (d.votesForClient, d.votesForFreelancer);
     }
 
-    function getDisputeArbitrators(uint256 disputeId)
+    function getDisputeArbitrators(
+        uint256 disputeId
+    )
         external
         view
         returns (address[ARBITRATORS_PER_DISPUTE] memory assignedArbitrators)
@@ -556,11 +609,17 @@ contract DisputeDAO is ERC2771Context, Ownable, ReentrancyGuard {
         return d.assignedArbitrators;
     }
 
-    function hasArbitratorVoted(uint256 disputeId, address arb) external view returns (bool) {
+    function hasArbitratorVoted(
+        uint256 disputeId,
+        address arb
+    ) external view returns (bool) {
         return _disputes[disputeId].hasVoted[arb];
     }
 
-    function arbitratorVote(uint256 disputeId, address arb) external view returns (uint8) {
+    function arbitratorVote(
+        uint256 disputeId,
+        address arb
+    ) external view returns (uint8) {
         return _disputes[disputeId].votes[arb];
     }
 

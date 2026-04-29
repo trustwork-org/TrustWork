@@ -7,28 +7,8 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ERC2771Context} from "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
-
-interface IDisputeDAO {
-    function openDispute(
-        uint256 jobId,
-        uint256 milestoneIndex,
-        address client,
-        address freelancer,
-        address raisedBy,
-        string calldata evidenceCID,
-        uint256 arbitratorFee,
-        uint256 platformFee
-    ) external returns (uint256);
-}
-
-interface IReputationNFT {
-    function checkAndMint(
-        address freelancer,
-        uint256 totalJobsDone,
-        uint256 avgRating,
-        uint256 totalEarned
-    ) external;
-}
+import {IDisputeDAO} from "../interfaces/IDisputeDAO.sol";
+import {IReputationNFT} from "../interfaces/IReputationNFT.sol";
 
 /**
  * @title EscrowPlatform
@@ -62,11 +42,11 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
     // Constants
     // =====================================================================
 
-    uint256 public constant BPS_DENOMINATOR     = 10_000;
-    uint256 public constant CLIENT_FEE_BPS      = 200;   // 2%
-    uint256 public constant FREELANCER_FEE_BPS  = 800;   // 8%
-    uint256 public constant DISPUTE_ARB_BPS     = 600;   // 6%
-    uint256 public constant DISPUTE_PLAT_BPS    = 200;   // 2%
+    uint256 public constant BPS_DENOMINATOR = 10_000;
+    uint256 public constant CLIENT_FEE_BPS = 200; // 2%
+    uint256 public constant FREELANCER_FEE_BPS = 800; // 8%
+    uint256 public constant DISPUTE_ARB_BPS = 600; // 6%
+    uint256 public constant DISPUTE_PLAT_BPS = 200; // 2%
 
     uint256 public constant MIN_FEE_PERCENT = 1;
     uint256 public constant MAX_FEE_PERCENT = 8;
@@ -74,7 +54,7 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
     uint256 public constant FLAGS_FOR_BAN = 3;
     uint256 public constant RESCUE_GRACE_PERIOD = 30 days;
 
-    uint8 public constant WINNER_CLIENT     = 1;
+    uint8 public constant WINNER_CLIENT = 1;
     uint8 public constant WINNER_FREELANCER = 2;
 
     // =====================================================================
@@ -82,7 +62,7 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
     // =====================================================================
 
     enum JobCategory {
-        OTHERS,                    // 0 = default zero value
+        OTHERS, // 0 = default zero value
         WEB_DEVELOPMENT,
         MOBILE_DEVELOPMENT,
         SMART_CONTRACT_DEVELOPMENT,
@@ -99,7 +79,7 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
     }
 
     enum JobStatus {
-        NONE,        // 0 = job does not exist
+        NONE, // 0 = job does not exist
         OPEN,
         ACTIVE,
         DISPUTED,
@@ -109,7 +89,7 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
     }
 
     enum MilestoneStatus {
-        PENDING,         // 0 = default
+        PENDING, // 0 = default
         SUBMITTED,
         RELEASED,
         DISPUTED,
@@ -124,13 +104,13 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
     struct Job {
         uint256 jobId;
         address client;
-        address freelancer;       // address(0) until approveApplicant
-        uint256 depositAmount;    // total USDC client put in
-        uint256 clientFee;        // 2% of depositAmount
+        address freelancer; // address(0) until approveApplicant
+        uint256 depositAmount; // total USDC client put in
+        uint256 clientFee; // 2% of depositAmount
         uint256 availableForWork; // depositAmount - clientFee (= 98%)
-        uint256 amountReleased;   // running total paid to freelancer
+        uint256 amountReleased; // running total paid to freelancer
         bool poorWorkReported;
-        bool clientFeeForwarded;  // true once 2% has left the contract
+        bool clientFeeForwarded; // true once 2% has left the contract
         JobCategory category;
         JobStatus status;
         uint256 createdAt;
@@ -156,7 +136,7 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
     address public profileRegistry;
     address public platformTreasury;
     address public governance; // can adjust feePercent within bounds
-    address public multisig;   // can pause and rotate critical addresses
+    address public multisig; // can pause and rotate critical addresses
 
     uint256 public jobCounter;
     uint256 public feePercent = 5; // DAO-tunable within [MIN_FEE_PERCENT, MAX_FEE_PERCENT]
@@ -192,14 +172,21 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
     );
     event AppliedToJob(uint256 indexed jobId, address indexed freelancer);
     event ApplicantApproved(uint256 indexed jobId, address indexed freelancer);
-    event MilestoneSubmitted(uint256 indexed jobId, uint256 indexed milestoneIndex, string submissionNote);
+    event MilestoneSubmitted(
+        uint256 indexed jobId,
+        uint256 indexed milestoneIndex,
+        string submissionNote
+    );
     event MilestoneApproved(
         uint256 indexed jobId,
         uint256 indexed milestoneIndex,
         uint256 platformShare,
         uint256 freelancerShare
     );
-    event MilestoneRejected(uint256 indexed jobId, uint256 indexed milestoneIndex);
+    event MilestoneRejected(
+        uint256 indexed jobId,
+        uint256 indexed milestoneIndex
+    );
     event DisputeRaised(
         uint256 indexed jobId,
         uint256 indexed milestoneIndex,
@@ -218,7 +205,10 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
     event FreelancerBanned(address indexed freelancer);
 
     event FeePercentSet(uint256 previous, uint256 current);
-    event PlatformTreasurySet(address indexed previous, address indexed current);
+    event PlatformTreasurySet(
+        address indexed previous,
+        address indexed current
+    );
     event DisputeDAOSet(address indexed previous, address indexed current);
     event ReputationNFTSet(address indexed previous, address indexed current);
     event ProfileRegistrySet(address indexed previous, address indexed current);
@@ -316,7 +306,8 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
     // =====================================================================
 
     function setFeePercent(uint256 newFee) external onlyGovernance {
-        if (newFee < MIN_FEE_PERCENT || newFee > MAX_FEE_PERCENT) revert InvalidFeePercent();
+        if (newFee < MIN_FEE_PERCENT || newFee > MAX_FEE_PERCENT)
+            revert InvalidFeePercent();
         emit FeePercentSet(feePercent, newFee);
         feePercent = newFee;
     }
@@ -359,7 +350,9 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
         reputationNFT = newNFT;
     }
 
-    function setProfileRegistry(address newRegistry) external onlyMultisig whenPaused {
+    function setProfileRegistry(
+        address newRegistry
+    ) external onlyMultisig whenPaused {
         if (newRegistry == address(0)) revert ZeroAddress();
         emit ProfileRegistrySet(profileRegistry, newRegistry);
         profileRegistry = newRegistry;
@@ -424,19 +417,29 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
 
         Milestone[] storage ms = _jobMilestones[jobId];
         for (uint256 i = 0; i < amounts.length; ++i) {
-            ms.push(Milestone({
-                description: descriptions[i],
-                amount: amounts[i],
-                deadline: deadline,
-                submissionNote: "",
-                status: MilestoneStatus.PENDING
-            }));
+            ms.push(
+                Milestone({
+                    description: descriptions[i],
+                    amount: amounts[i],
+                    deadline: deadline,
+                    submissionNote: "",
+                    status: MilestoneStatus.PENDING
+                })
+            );
         }
 
         _clientJobs[client].push(jobId);
         jobBalance[jobId] = depositAmount;
 
-        emit JobCreated(jobId, client, category, depositAmount, clientFee, availableForWork, deadline);
+        emit JobCreated(
+            jobId,
+            client,
+            category,
+            depositAmount,
+            clientFee,
+            availableForWork,
+            deadline
+        );
     }
 
     function applyToJob(uint256 jobId) external whenNotPaused jobExists(jobId) {
@@ -454,13 +457,10 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
         emit AppliedToJob(jobId, sender);
     }
 
-    function approveApplicant(uint256 jobId, address freelancer)
-        external
-        whenNotPaused
-        nonReentrant
-        jobExists(jobId)
-        onlyClient(jobId)
-    {
+    function approveApplicant(
+        uint256 jobId,
+        address freelancer
+    ) external whenNotPaused nonReentrant jobExists(jobId) onlyClient(jobId) {
         Job storage j = _jobs[jobId];
         if (j.status != JobStatus.OPEN) revert WrongJobStatus();
         if (!hasApplied[jobId][freelancer]) revert ApplicantNotFound();
@@ -477,12 +477,11 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
     // Milestone lifecycle
     // =====================================================================
 
-    function submitMilestone(uint256 jobId, uint256 milestoneIndex, string calldata submissionNote)
-        external
-        whenNotPaused
-        jobExists(jobId)
-        onlyFreelancer(jobId)
-    {
+    function submitMilestone(
+        uint256 jobId,
+        uint256 milestoneIndex,
+        string calldata submissionNote
+    ) external whenNotPaused jobExists(jobId) onlyFreelancer(jobId) {
         Job storage j = _jobs[jobId];
         if (j.status != JobStatus.ACTIVE) revert WrongJobStatus();
 
@@ -499,13 +498,10 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
         emit MilestoneSubmitted(jobId, milestoneIndex, submissionNote);
     }
 
-    function approveMilestone(uint256 jobId, uint256 milestoneIndex)
-        external
-        whenNotPaused
-        nonReentrant
-        jobExists(jobId)
-        onlyClient(jobId)
-    {
+    function approveMilestone(
+        uint256 jobId,
+        uint256 milestoneIndex
+    ) external whenNotPaused nonReentrant jobExists(jobId) onlyClient(jobId) {
         Job storage j = _jobs[jobId];
         if (j.status != JobStatus.ACTIVE) revert WrongJobStatus();
 
@@ -513,9 +509,11 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
         if (milestoneIndex >= ms.length) revert MilestoneIndexOOB();
 
         Milestone storage m = ms[milestoneIndex];
-        if (m.status != MilestoneStatus.SUBMITTED) revert WrongMilestoneStatus();
+        if (m.status != MilestoneStatus.SUBMITTED)
+            revert WrongMilestoneStatus();
 
-        uint256 platformShare = (m.amount * FREELANCER_FEE_BPS) / BPS_DENOMINATOR;
+        uint256 platformShare = (m.amount * FREELANCER_FEE_BPS) /
+            BPS_DENOMINATOR;
         uint256 freelancerShare = m.amount - platformShare;
 
         m.status = MilestoneStatus.RELEASED;
@@ -528,7 +526,12 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
         usdcToken.safeTransfer(platformTreasury, platformShare);
         usdcToken.safeTransfer(j.freelancer, freelancerShare);
 
-        emit MilestoneApproved(jobId, milestoneIndex, platformShare, freelancerShare);
+        emit MilestoneApproved(
+            jobId,
+            milestoneIndex,
+            platformShare,
+            freelancerShare
+        );
 
         // Check for completion.
         if (_allMilestonesReleased(ms)) {
@@ -542,22 +545,22 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
 
             // Best-effort reputation update — must never block fund release.
             if (reputationNFT != address(0)) {
-                try IReputationNFT(reputationNFT).checkAndMint(
-                    freelancer,
-                    freelancerCompletedJobs[freelancer],
-                    0,
-                    freelancerTotalEarned[freelancer]
-                ) {} catch {}
+                try
+                    IReputationNFT(reputationNFT).checkAndMint(
+                        freelancer,
+                        freelancerCompletedJobs[freelancer],
+                        0,
+                        freelancerTotalEarned[freelancer]
+                    )
+                {} catch {}
             }
         }
     }
 
-    function rejectMilestone(uint256 jobId, uint256 milestoneIndex)
-        external
-        whenNotPaused
-        jobExists(jobId)
-        onlyClient(jobId)
-    {
+    function rejectMilestone(
+        uint256 jobId,
+        uint256 milestoneIndex
+    ) external whenNotPaused jobExists(jobId) onlyClient(jobId) {
         Job storage j = _jobs[jobId];
         if (j.status != JobStatus.ACTIVE) revert WrongJobStatus();
 
@@ -565,7 +568,8 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
         if (milestoneIndex >= ms.length) revert MilestoneIndexOOB();
 
         Milestone storage m = ms[milestoneIndex];
-        if (m.status != MilestoneStatus.SUBMITTED) revert WrongMilestoneStatus();
+        if (m.status != MilestoneStatus.SUBMITTED)
+            revert WrongMilestoneStatus();
 
         m.status = MilestoneStatus.PENDING;
         emit MilestoneRejected(jobId, milestoneIndex);
@@ -575,12 +579,11 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
     // Dispute / exits
     // =====================================================================
 
-    function raiseDispute(uint256 jobId, uint256 milestoneIndex, string calldata evidenceCID)
-        external
-        whenNotPaused
-        nonReentrant
-        jobExists(jobId)
-    {
+    function raiseDispute(
+        uint256 jobId,
+        uint256 milestoneIndex,
+        string calldata evidenceCID
+    ) external whenNotPaused nonReentrant jobExists(jobId) {
         Job storage j = _jobs[jobId];
         address sender = _msgSender();
         if (sender != j.client && sender != j.freelancer) revert NotClient();
@@ -591,9 +594,10 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
         if (milestoneIndex >= ms.length) revert MilestoneIndexOOB();
 
         Milestone storage m = ms[milestoneIndex];
-        if (m.status != MilestoneStatus.SUBMITTED) revert WrongMilestoneStatus();
+        if (m.status != MilestoneStatus.SUBMITTED)
+            revert WrongMilestoneStatus();
 
-        uint256 arbFee = (m.amount * DISPUTE_ARB_BPS)  / BPS_DENOMINATOR; // 6%
+        uint256 arbFee = (m.amount * DISPUTE_ARB_BPS) / BPS_DENOMINATOR; // 6%
         uint256 platFee = (m.amount * DISPUTE_PLAT_BPS) / BPS_DENOMINATOR; // 2%
         uint256 totalToDAO = arbFee + platFee;
 
@@ -614,15 +618,19 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
             platFee
         );
 
-        emit DisputeRaised(jobId, milestoneIndex, sender, disputeId, arbFee, platFee);
+        emit DisputeRaised(
+            jobId,
+            milestoneIndex,
+            sender,
+            disputeId,
+            arbFee,
+            platFee
+        );
     }
 
-    function selfReportPoorWork(uint256 jobId)
-        external
-        whenNotPaused
-        jobExists(jobId)
-        onlyFreelancer(jobId)
-    {
+    function selfReportPoorWork(
+        uint256 jobId
+    ) external whenNotPaused jobExists(jobId) onlyFreelancer(jobId) {
         Job storage j = _jobs[jobId];
         if (j.status != JobStatus.ACTIVE) revert WrongJobStatus();
         j.poorWorkReported = true;
@@ -636,13 +644,9 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
      *             held in escrow for this job (deposit minus any milestones
      *             already released). No freelancer flag.
      */
-    function cancelJob(uint256 jobId)
-        external
-        whenNotPaused
-        nonReentrant
-        jobExists(jobId)
-        onlyClient(jobId)
-    {
+    function cancelJob(
+        uint256 jobId
+    ) external whenNotPaused nonReentrant jobExists(jobId) onlyClient(jobId) {
         Job storage j = _jobs[jobId];
         bool conditionA = (j.status == JobStatus.OPEN);
         bool conditionB = (j.status == JobStatus.ACTIVE && j.poorWorkReported);
@@ -663,17 +667,15 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
      *         pull all locked USDC after the job deadline has passed by
      *         RESCUE_GRACE_PERIOD AND no milestone was ever submitted.
      */
-    function rescueClientRefund(uint256 jobId)
-        external
-        whenNotPaused
-        nonReentrant
-        jobExists(jobId)
-        onlyClient(jobId)
-    {
+    function rescueClientRefund(
+        uint256 jobId
+    ) external whenNotPaused nonReentrant jobExists(jobId) onlyClient(jobId) {
         Job storage j = _jobs[jobId];
         if (j.status != JobStatus.ACTIVE) revert WrongJobStatus();
-        if (block.timestamp <= j.deadline + RESCUE_GRACE_PERIOD) revert RescueConditionsUnmet();
-        if (_anyMilestoneEverSubmitted(_jobMilestones[jobId])) revert RescueConditionsUnmet();
+        if (block.timestamp <= j.deadline + RESCUE_GRACE_PERIOD)
+            revert RescueConditionsUnmet();
+        if (_anyMilestoneEverSubmitted(_jobMilestones[jobId]))
+            revert RescueConditionsUnmet();
 
         uint256 refund = jobBalance[jobId];
         jobBalance[jobId] = 0;
@@ -707,7 +709,8 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
         if (m.status != MilestoneStatus.DISPUTED) revert WrongMilestoneStatus();
 
         // 92% of milestone (the 8% was already sent to DisputeDAO at raiseDispute).
-        uint256 disputedRemainder = m.amount - ((m.amount * FREELANCER_FEE_BPS) / BPS_DENOMINATOR);
+        uint256 disputedRemainder = m.amount -
+            ((m.amount * FREELANCER_FEE_BPS) / BPS_DENOMINATOR);
 
         // Sum all PENDING milestones — these refund to client regardless of winner.
         uint256 pendingRefund;
@@ -771,7 +774,9 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
         emit ClientFeeForwarded(jobId, j.clientFee);
     }
 
-    function _allMilestonesReleased(Milestone[] storage ms) internal view returns (bool) {
+    function _allMilestonesReleased(
+        Milestone[] storage ms
+    ) internal view returns (bool) {
         uint256 len = ms.length;
         for (uint256 i = 0; i < len; ++i) {
             if (ms[i].status != MilestoneStatus.RELEASED) return false;
@@ -779,7 +784,9 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
         return true;
     }
 
-    function _anyMilestoneDisputed(Milestone[] storage ms) internal view returns (bool) {
+    function _anyMilestoneDisputed(
+        Milestone[] storage ms
+    ) internal view returns (bool) {
         uint256 len = ms.length;
         for (uint256 i = 0; i < len; ++i) {
             if (ms[i].status == MilestoneStatus.DISPUTED) return true;
@@ -787,7 +794,9 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
         return false;
     }
 
-    function _anyMilestoneEverSubmitted(Milestone[] storage ms) internal view returns (bool) {
+    function _anyMilestoneEverSubmitted(
+        Milestone[] storage ms
+    ) internal view returns (bool) {
         uint256 len = ms.length;
         for (uint256 i = 0; i < len; ++i) {
             MilestoneStatus s = ms[i].status;
@@ -804,24 +813,36 @@ contract EscrowPlatform is ERC2771Context, Pausable, ReentrancyGuard {
         return _jobs[jobId];
     }
 
-    function getMilestones(uint256 jobId) external view returns (Milestone[] memory) {
+    function getMilestones(
+        uint256 jobId
+    ) external view returns (Milestone[] memory) {
         return _jobMilestones[jobId];
     }
 
-    function getMilestone(uint256 jobId, uint256 milestoneIndex) external view returns (Milestone memory) {
-        if (milestoneIndex >= _jobMilestones[jobId].length) revert MilestoneIndexOOB();
+    function getMilestone(
+        uint256 jobId,
+        uint256 milestoneIndex
+    ) external view returns (Milestone memory) {
+        if (milestoneIndex >= _jobMilestones[jobId].length)
+            revert MilestoneIndexOOB();
         return _jobMilestones[jobId][milestoneIndex];
     }
 
-    function getApplicants(uint256 jobId) external view returns (address[] memory) {
+    function getApplicants(
+        uint256 jobId
+    ) external view returns (address[] memory) {
         return _jobApplicants[jobId];
     }
 
-    function getClientJobs(address client) external view returns (uint256[] memory) {
+    function getClientJobs(
+        address client
+    ) external view returns (uint256[] memory) {
         return _clientJobs[client];
     }
 
-    function getFreelancerJobs(address freelancer) external view returns (uint256[] memory) {
+    function getFreelancerJobs(
+        address freelancer
+    ) external view returns (uint256[] memory) {
         return _freelancerJobs[freelancer];
     }
 
