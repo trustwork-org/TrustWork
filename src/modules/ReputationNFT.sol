@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.28;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC2771Context} from "@openzeppelin/contracts/metatx/ERC2771Context.sol";
@@ -85,7 +85,10 @@ contract ReputationNFT is ERC721, ERC2771Context, Ownable {
         _;
     }
 
-    constructor(address trustedForwarder_, address initialOwner)
+    constructor(
+        address trustedForwarder_,
+        address initialOwner
+    )
         ERC721("TrustWork Reputation", "TWREP")
         ERC2771Context(trustedForwarder_)
         Ownable(initialOwner)
@@ -161,9 +164,22 @@ contract ReputationNFT is ERC721, ERC2771Context, Ownable {
         freelancerTokenId[freelancer] = newTokenId;
 
         if (existingTier == 0) {
-            emit TierMinted(freelancer, newTokenId, eligibleTier, totalJobsDone, avgRating, totalEarned);
+            emit TierMinted(
+                freelancer,
+                newTokenId,
+                eligibleTier,
+                totalJobsDone,
+                avgRating,
+                totalEarned
+            );
         } else {
-            emit TierUpgraded(freelancer, oldTokenId, newTokenId, existingTier, eligibleTier);
+            emit TierUpgraded(
+                freelancer,
+                oldTokenId,
+                newTokenId,
+                existingTier,
+                eligibleTier
+            );
         }
     }
 
@@ -180,13 +196,17 @@ contract ReputationNFT is ERC721, ERC2771Context, Ownable {
         return "";
     }
 
-    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+    function tokenURI(
+        uint256 tokenId
+    ) public view override returns (string memory) {
         if (_ownerOf(tokenId) == address(0)) revert TokenDoesNotExist(tokenId);
         if (bytes(_baseTokenURI).length == 0) return "";
         return string.concat(_baseTokenURI, tokenId.toString());
     }
 
-    function _eligibleTierFor(uint256 totalJobsDone) internal view returns (uint8) {
+    function _eligibleTierFor(
+        uint256 totalJobsDone
+    ) internal view returns (uint8) {
         uint8 tier;
         for (uint256 i = 0; i < TIER_COUNT; ++i) {
             if (totalJobsDone >= thresholds[i]) {
@@ -202,11 +222,11 @@ contract ReputationNFT is ERC721, ERC2771Context, Ownable {
     // Soulbound enforcement (OZ v5: _update)
     // ---------------------------------------------------------------------
 
-    function _update(address to, uint256 tokenId, address auth)
-        internal
-        override
-        returns (address)
-    {
+    function _update(
+        address to,
+        uint256 tokenId,
+        address auth
+    ) internal override returns (address) {
         address from = _ownerOf(tokenId);
         // Permit mint (from == 0) and burn (to == 0); reject any wallet-to-wallet move.
         if (from != address(0) && to != address(0)) revert Soulbound();

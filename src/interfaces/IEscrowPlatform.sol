@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.28;
 
 /// @notice Minimal interface DisputeDAO uses to call back into EscrowPlatform.
 ///         winner is encoded as 1 = CLIENT, 2 = FREELANCER.
