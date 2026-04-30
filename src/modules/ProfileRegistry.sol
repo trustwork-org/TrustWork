@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.28;
 
 /**
  * @title ProfileRegistry
@@ -19,8 +19,16 @@ contract ProfileRegistry {
 
     mapping(address => Profile) private _profiles;
 
-    event ProfileRegistered(address indexed user, string profileCID, uint256 timestamp);
-    event ProfileUpdated(address indexed user, string profileCID, uint256 timestamp);
+    event ProfileRegistered(
+        address indexed user,
+        string profileCID,
+        uint256 timestamp
+    );
+    event ProfileUpdated(
+        address indexed user,
+        string profileCID,
+        uint256 timestamp
+    );
 
     error AlreadyRegistered();
     error NotRegistered();
@@ -65,10 +73,17 @@ contract ProfileRegistry {
      * @return updatedAt     Block timestamp of last update.
      * @return registered    Whether the address has ever registered.
      */
-    function getProfile(address user)
+    function getProfile(
+        address user
+    )
         external
         view
-        returns (string memory profileCID, uint256 registeredAt, uint256 updatedAt, bool registered)
+        returns (
+            string memory profileCID,
+            uint256 registeredAt,
+            uint256 updatedAt,
+            bool registered
+        )
     {
         Profile storage p = _profiles[user];
         return (p.profileCID, p.registeredAt, p.updatedAt, p.isRegistered);
