@@ -194,7 +194,10 @@ contract DisputeDAOTest is Test {
 
         // Validate Rewards and Slashes
         // assigned[2] is the minority. 10% of 10e6 = 1e6 slash.
-        assertEq(dao.arbitratorStake(assigned[2]), 9e6);
+        // Because remaining stake (9e6) < minStake (10e6), they are evicted!
+        assertEq(dao.arbitratorStake(assigned[2]), 0);
+        assertFalse(dao.isArbitrator(assigned[2]));
+        assertEq(usdc.balanceOf(assigned[2]), 99e6); // 90e6 (pre-stake) + 9e6 (refunded)
 
         // majority (assigned[0] & [1]) share the 6e6 reward -> 3e6 each.
         // Since initial balance was 90e6 (after 10e6 stake), new balance = 93e6.
@@ -223,9 +226,11 @@ contract DisputeDAOTest is Test {
         
         assertEq(escrowMock.lastWinner(), 2); // Freelancer wins
         
-        // non-voters slashed 10%
-        assertEq(dao.arbitratorStake(assigned[1]), 9e6);
-        assertEq(dao.arbitratorStake(assigned[2]), 9e6);
+        // non-voters slashed 10% -> stake drops to 9e6 < minStake -> auto-evicted
+        assertEq(dao.arbitratorStake(assigned[1]), 0);
+        assertEq(dao.arbitratorStake(assigned[2]), 0);
+        assertFalse(dao.isArbitrator(assigned[1]));
+        assertFalse(dao.isArbitrator(assigned[2]));
         
         // Treasury gets 2e6 (plat fee) + 2e6 (two 1e6 slashes) = 4e6
         assertEq(usdc.balanceOf(platformTreasury), 4e6);
