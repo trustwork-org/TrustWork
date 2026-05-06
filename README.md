@@ -1,66 +1,31 @@
-## Foundry
+# TrustWork Smart Contracts
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+This workspace contains the Solidity contracts and deployment scripts for TrustWork.
 
-Foundry consists of:
+## Key Contracts
 
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+1. `EscrowPlatform.sol` - job creation, milestones, escrow custody, settlement, and cancellation flows.
+2. `DisputeDAO.sol` - arbitrator pool, voting, and dispute resolution.
+3. `ReputationNFT.sol` - non-transferable reputation tiers.
+4. `ProfileRegistry.sol` - wallet-to-IPFS profile mapping.
 
-## Documentation
+## Development Commands
 
-https://book.getfoundry.sh/
-
-## Usage
-
-### Build
-
-```shell
-$ forge build
+```bash
+forge install
+forge build
+forge test
+forge fmt
 ```
 
-### Test
+## Deployment
 
-```shell
-$ forge test
+```bash
+forge script script/Deploy.s.sol --rpc-url $LISK_RPC --broadcast --verify
 ```
 
-### Format
+## Related Docs
 
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+1. [Contract Architecture](./ARCHITECTURE.md)
+2. [Project Documentation Index](../docs/index.md)
+3. [Development Setup](../docs/DEVELOPMENT.md)
